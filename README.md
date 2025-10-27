@@ -6,9 +6,7 @@ Just paste the **absolute path** of your project folder into the input box and c
 
 I created this tool to make it faster to copy project contents. For example, when I want to ask GPT to help me understand someone else’s project, I don’t have to manually open each file and copy its contents one by one — everything I need is collected automatically in one place.  
 
-While building this tool, I also learned a lot about working with files in Python and using Tkinter to build a GUI. It was a really fun experience, and I added detailed comments in the first commit so you can check them out if you’re curious about how it works.  
-
-I plan to improve this tool in future versions. The UI could look better, I’ll add instructions and error messages, and eventually package it for both Windows and macOS. I also plan to filter out unnecessary files like `.git` and `.DS_Store`. Right now, scanning large projects can be slow, so I’ll work on optimizing that too.  
+While building this tool, I also learned a lot about working with files in Python and using Tkinter to build a GUI. It was a really fun experience, and I added detailed comments in the first commit so you can check them out if you’re curious about how it works. I plan to improve this tool in future versions. Show a better UI, add instructions and display error messages.
 
 If you want to use this tool on your computer, clone this repository and navigate to the project folder. Then, run:
 ```python

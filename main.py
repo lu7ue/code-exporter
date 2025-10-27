@@ -1,144 +1,162 @@
-# Import the tkinter library for GUI creation
 import tkinter as tk
-# Import messagebox from tkinter to show pop-up messages (error/warning/info)
 from tkinter import messagebox
-# Import Path from pathlib for easy and clean file and folder handling
 from pathlib import Path
+import os
 
-# If you want to view more notes about working with files in python and Tkinter usage, please check this link: https://github.com/lu7ue/noteverse/tree/main/what_i_learnt/Python
+# --- Ignore rules (cross-language, conservative) --- #
+
+SKIP_DIRS = {
+    # VCS / IDE
+    ".git", ".svn", ".hg", ".idea", ".vscode", ".cache",
+    # Python
+    "__pycache__", "venv", ".venv", "env", ".mypy_cache", ".pytest_cache", ".tox", ".ruff_cache",
+    # Node / JS
+    "node_modules", ".yarn", ".yarn/cache", ".pnp", ".pnp.cjs", ".pnpm-store", ".parcel-cache",
+    "dist", "build", "coverage", ".next", ".nuxt", ".svelte-kit", ".angular",
+    # Java / Kotlin / Android
+    "out", "target", ".gradle", "build", ".cxx",
+    # Rust
+    "target", ".cargo",
+    # Go / PHP / Ruby / Swift
+    "vendor", "Pods", ".bundle", ".swiftpm", ".build", "Packages",
+    # Misc tool caches
+    ".sass-cache", ".nyc_output"
+}
+
+SKIP_FILES = {
+    # OS cruft
+    ".DS_Store", "Thumbs.db", "desktop.ini",
+    # Lock files that don’t add code insight
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Pipfile.lock", "poetry.lock",
+    "composer.lock", "Cargo.lock", "Podfile.lock", "Gemfile.lock"
+}
+
+SKIP_EXTS = {
+    # Compiled / bytecode / objects
+    ".pyc", ".pyo", ".class", ".o", ".obj", ".dll", ".so", ".dylib", ".exe",
+    # Editor swap/backup/temp
+    ".log", ".tmp", ".bak", ".swp", ".swo",
+    # Large binaries that rarely help for “code review” style exports
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf",
+    ".zip", ".tar", ".gz", ".bz2", ".7z",
+    ".mp4", ".mov", ".avi", ".mp3", ".wav"
+}
+
+def should_skip_file(path: Path) -> bool:
+    """Return True if a file should be skipped."""
+    if path.name in SKIP_FILES:
+        return True
+    if path.suffix.lower() in SKIP_EXTS:
+        return True
+    return False
+
+def should_prune_dir(dirname: str) -> bool:
+    """Return True if a directory should be pruned from traversal."""
+    return dirname in SKIP_DIRS
 
 # --- Functions --- #
 
 def scan_folder():
-    """Scan the given folder and list all files inside it."""
-    
-    # Get the text input from the Entry widget (folder path)
+    """Scan the given folder and list all files inside it (with filtering)."""
     folder = folder_entry.get().strip()
-    
-    # Convert the folder string into a Path object for easier path handling
     root = Path(folder)
 
-    # Check if the path exists and is a directory
     if not root.exists() or not root.is_dir():
-        messagebox.showerror("Error", "Invalid folder path!")  # Show error popup if invalid
-        return  # Stop the function here
+        messagebox.showerror("Error", "Invalid folder path!")
+        return
 
-    # Clear any previous results (checkboxes and data lists)
+    # Clear previous results
     for widget in files_frame.winfo_children():
-        widget.destroy()  # Remove all previous checkboxes from the frame
-    file_vars.clear()  # Clear list of BooleanVars (checkbox states)
-    files.clear()      # Clear list of file paths
+        widget.destroy()
+    file_vars.clear()
+    files.clear()
 
-    # Walk through all files in the folder (recursively)
-    for i, file_path in enumerate(root.rglob("*")):
-        # Only include actual files (ignore folders)
-        if file_path.is_file():
-            # Create a BooleanVar to track whether this file is selected or not
-            var = tk.BooleanVar(value=False)  # Default unchecked
-            
-            # Create a checkbox with the file's relative path as the label
+    i = 0
+    # Use os.walk so we can prune directories in-place for speed
+    for dirpath, dirs, filenames in os.walk(root):
+        # Prune ignored dirs BEFORE descending
+        dirs[:] = [d for d in dirs if not should_prune_dir(d)]
+
+        base = Path(dirpath)
+        for filename in filenames:
+            file_path = base / filename
+            # Skip files by name/extension
+            if should_skip_file(file_path):
+                continue
+            # Also skip if any ancestor is in SKIP_DIRS (defensive, in case of symlinks, etc.)
+            if any(part in SKIP_DIRS for part in file_path.relative_to(root).parts):
+                continue
+
+            var = tk.BooleanVar(value=False)
             cb = tk.Checkbutton(
                 files_frame,
-                text=str(file_path.relative_to(root)),  # Display path relative to folder root
-                variable=var,  # Connect this checkbox to the BooleanVar
-                anchor="w"     # Align text to the left (west)
+                text=str(file_path.relative_to(root)),
+                variable=var,
+                anchor="w"
             )
-            
-            # Place the checkbox in the grid layout (each on a new row)
             cb.grid(row=i, column=0, sticky="w")
-            
-            # Store the variable and file path for later use
             file_vars.append(var)
             files.append(file_path)
+            i += 1
 
+    if i == 0:
+        messagebox.showinfo("No Files Found", "No eligible files found in this folder!")
 
 def export_files():
     """Export selected files and their contents into one text file."""
-    
-    # If there are no files listed, show a warning
     if not files:
         messagebox.showwarning("Warning", "No files to export!")
         return
 
-    # Define the output file path inside the user's Downloads folder
     downloads = Path.home() / "Downloads"
     output_file = downloads / "project_export.txt"
 
-    # Open (or create) the export file for writing (overwrite mode)
     with open(output_file, "w", encoding="utf-8") as out:
-        # Go through each file and its checkbox state together
         for file_path, var in zip(files, file_vars):
-            if var.get():  # Only include checked (selected) files
+            if var.get():
                 try:
-                    # Read the file content and strip extra blank lines/spaces
                     content = file_path.read_text(encoding="utf-8").strip()
                     if not content:
-                        content = "empty file."  # Mark empty files
+                        content = "empty file."
                 except (UnicodeDecodeError, FileNotFoundError):
-                    # Handle files that can’t be read properly
                     content = "[Could not read file]"
-                
-                # Write file path and its content into the export file
                 out.write(f"{file_path}:\n{content}\n\n")
 
-    # Show info popup when export finishes successfully
     messagebox.showinfo("Export Complete", f"Exported selected files to:\n{output_file}")
-
 
 # --- GUI (User Interface) --- #
 
-# Create the main application window
 root = tk.Tk()
-root.title("File Exporter")  # Set window title
+root.title("File Exporter")
 
-# --- Folder input section --- #
 tk.Label(root, text="Folder Path:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-# Entry box for user to input the folder path
 folder_entry = tk.Entry(root, width=50)
 folder_entry.grid(row=0, column=1, padx=5, pady=5)
-# "OK" button to trigger folder scan
 tk.Button(root, text="OK", command=scan_folder).grid(row=0, column=2, padx=5, pady=5)
 
-# --- File list area (scrollable) --- #
-# Create a frame to hold checkboxes (inside a scrollable area)
 files_frame = tk.Frame(root)
 files_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
 
-# Allow the file list frame to expand with the window
 root.grid_rowconfigure(1, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
-# --- Scrollbar setup --- #
-canvas = tk.Canvas(files_frame)  # Canvas acts as a scrollable area
+canvas = tk.Canvas(files_frame)
 scrollbar = tk.Scrollbar(files_frame, orient="vertical", command=canvas.yview)
-scrollable_frame = tk.Frame(canvas)  # Actual frame that will hold the checkboxes
+scrollable_frame = tk.Frame(canvas)
 
-# Update scrollable region whenever new widgets are added
-scrollable_frame.bind(
-    "<Configure>",
-    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-)
-
-# Embed the scrollable frame into the canvas
+scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-# Connect scrollbar to the canvas
 canvas.configure(yscrollcommand=scrollbar.set)
 
-# Pack (display) the canvas and scrollbar side by side
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-# --- Export button at the bottom --- #
 tk.Button(root, text="Export Selected Files", command=export_files).grid(
     row=2, column=0, columnspan=3, pady=10
 )
 
-# --- Data storage --- #
-files = []       # Stores the Path objects (actual file paths)
-file_vars = []   # Stores the BooleanVar linked to each checkbox
-
-# Redirect file checkboxes to appear inside the scrollable frame
+files = []
+file_vars = []
 files_frame = scrollable_frame
 
-# Keep the GUI running (event loop)
 root.mainloop()
