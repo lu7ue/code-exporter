@@ -1,0 +1,30 @@
+# ---- Python general ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.bak
+
+# ---- Virtual environments ----
+venv/
+.env/
+.venv/
+
+# ---- Build artifacts ----
+build/
+dist/
+*.spec
+
+# ---- System files ----
+.DS_Store
+Thumbs.db
+
+# ---- IDE / Editor settings ----
+.idea/
+.vscode/
+
+# ---- OS generated ----
+*.swp
+*.swo
