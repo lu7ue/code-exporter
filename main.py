@@ -3,6 +3,8 @@ import tkinter.ttk as ttk
 from tkinter import messagebox
 from pathlib import Path
 import os
+from tkinterdnd2 import DND_FILES
+from tkinterdnd2 import TkinterDnD
 
 # --- Ignore rules (cross-language, conservative) --- #
 
@@ -197,7 +199,7 @@ def export_files():
 
 # --- GUI --- #
 
-root = tk.Tk()
+root = TkinterDnD.Tk()
 root.title("Otter")
 
 tk.Label(root, text="Folder Path:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
@@ -205,15 +207,82 @@ folder_entry = tk.Entry(root, width=50)
 folder_entry.grid(row=0, column=1, padx=5, pady=5)
 tk.Button(root, text="OK", command=scan_folder).grid(row=0, column=2, padx=5, pady=5)
 
+# --- Drag & Drop folder drop zone ---
+drop_frame = tk.Frame(root)
+drop_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=12, pady=12)
+
+# canvas (no background = inherit macOS system look)
+drop_canvas = tk.Canvas(
+    drop_frame,
+    height=60,
+    highlightthickness=0,
+    bd=0
+)
+drop_canvas.pack(fill="both", expand=True)
+
+# draw border
+def draw_border(color="#8e8e93"):
+    drop_canvas.delete("border")
+
+    w = max(drop_canvas.winfo_width() - 4, 1)
+    h = max(drop_canvas.winfo_height() - 4, 1)
+
+    drop_canvas.create_rectangle(
+        2, 2, w, h,
+        outline=color,
+        width=1,
+        tag="border"
+    )
+
+# ensure the border draws when size changes
+drop_canvas.bind("<Configure>", lambda e: draw_border())
+
+# initial draw after layout
+drop_canvas.after(50, draw_border)
+
+# centered label
+text_id = drop_canvas.create_text(
+    0, 0,
+    text="Paste your project path above\nor drop the folder here",
+    anchor="center",
+    fill="#444",
+    justify="center",
+    width=drop_canvas.winfo_width() - 40
+)
+
+# keep text centered
+def reposition_text(event):
+    drop_canvas.coords(text_id, drop_canvas.winfo_width()/2, drop_canvas.winfo_height()/2)
+
+drop_canvas.bind("<Configure>", reposition_text)
+
+# drag drop event
+def on_drop(event):
+    path = event.data.strip().strip("{}")
+    if os.path.isdir(path):
+        folder_entry.delete(0, tk.END)
+        folder_entry.insert(0, path)
+        scan_folder()
+
+drop_frame.drop_target_register(DND_FILES)
+drop_frame.dnd_bind("<<Drop>>", on_drop)
+
+# drag enter / leave (no highlight, just redraw)
+def on_drag(event):
+    draw_border("#555555")
+
+drop_frame.dnd_bind("<<DragEnter>>", on_drag)
+drop_frame.dnd_bind("<<DragLeave>>", lambda e: draw_border())
+
 # Container holding selection bar + file list
 files_frame_container = tk.Frame(root)
-files_frame_container.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
+files_frame_container.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
 
 files_frame_container.grid_columnconfigure(0, weight=1)
 files_frame_container.grid_columnconfigure(1, weight=0)
 files_frame_container.grid_rowconfigure(2, weight=1)
 
-root.grid_rowconfigure(1, weight=1)
+root.grid_rowconfigure(2, weight=1)
 for c in range(3):
     root.grid_columnconfigure(c, weight=1)
 
@@ -272,7 +341,7 @@ files = []
 file_vars = []
 
 tk.Button(root, text="Export Selected Files", command=export_files).grid(
-    row=2, column=0, columnspan=3, pady=10
+    row=3, column=0, columnspan=3, pady=10
 )
 
 def _on_mousewheel(event):
