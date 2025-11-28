@@ -1,4 +1,5 @@
 import tkinter as tk
+import tkinter.ttk as ttk
 from tkinter import messagebox
 from pathlib import Path
 import os
@@ -12,15 +13,17 @@ SKIP_DIRS = {
     "__pycache__", "venv", ".venv", "env", ".mypy_cache", ".pytest_cache", ".tox", ".ruff_cache",
     # Node / JS
     "node_modules", ".yarn", ".yarn/cache", ".pnp", ".pnp.cjs", ".pnpm-store", ".parcel-cache",
-    "dist", "build", "coverage", ".next", ".nuxt", ".svelte-kit", ".angular",
+    "dist", "coverage", ".next", ".nuxt", ".svelte-kit", ".angular",
     # Java / Kotlin / Android
-    "out", "target", ".gradle", "build", ".cxx",
+    "out", "target", ".gradle", ".cxx",
     # Rust
     "target", ".cargo",
     # Go / PHP / Ruby / Swift
     "vendor", "Pods", ".bundle", ".swiftpm", ".build", "Packages",
     # Misc tool caches
-    ".sass-cache", ".nyc_output"
+    ".sass-cache", ".nyc_output",
+    # Godot engine cache
+    ".godot", "shader_cache",
 }
 
 SKIP_FILES = {
@@ -36,10 +39,24 @@ SKIP_EXTS = {
     ".pyc", ".pyo", ".class", ".o", ".obj", ".dll", ".so", ".dylib", ".exe",
     # Editor swap/backup/temp
     ".log", ".tmp", ".bak", ".swp", ".swo",
-    # Large binaries that rarely help for “code review” style exports
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf",
+    # Large binaries unlikely helpful for code reviewing
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico",
     ".zip", ".tar", ".gz", ".bz2", ".7z",
-    ".mp4", ".mov", ".avi", ".mp3", ".wav"
+    ".mp4", ".mov", ".avi", ".mp3", ".wav",
+    # Godot / game engine config & cache
+    ".cfg", ".import", ".translation",
+    # More image & vector assets
+    ".svg", ".tiff", ".bmp",
+    # 3D / CAD files
+    ".blend", ".fbx", ".obj", ".stl", ".dae",
+    # Misc project clutter
+    ".lock", ".orig", ".rej", ".psd",
+    # Document formats
+    ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx",
+    # eBook / text archives
+    ".epub", ".mobi",
+    # Additional binary blobs
+    ".rtf", ".odt", ".ods", ".odp",
 }
 
 def should_skip_file(path: Path) -> bool:
@@ -54,7 +71,46 @@ def should_prune_dir(dirname: str) -> bool:
     """Return True if a directory should be pruned from traversal."""
     return dirname in SKIP_DIRS
 
-# --- Functions --- #
+# --- Read .gitignore and convert its patterns to usable sets --- #
+def load_gitignore_patterns(root: Path):
+    """
+    Read .gitignore and return two sets:
+    - ignored_dirs: directory names that should be skipped
+    - ignored_files: file name patterns or extensions to skip
+    """
+    gitignore_path = root / ".gitignore"
+    ignored_dirs = set()
+    ignored_files = set()
+
+    if not gitignore_path.exists():
+        return ignored_dirs, ignored_files
+
+    try:
+        lines = gitignore_path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return ignored_dirs, ignored_files
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if line.startswith("/"):
+            line = line[1:]
+
+        if line.endswith("/"):
+            ignored_dirs.add(line.rstrip("/"))
+            continue
+
+        if line.startswith("*."):
+            ignored_files.add(line[1:])   # store ".log"
+            continue
+
+        ignored_files.add(line)
+
+    return ignored_dirs, ignored_files
+
+# --- Main actions --- #
 
 def scan_folder():
     """Scan the given folder and list all files inside it (with filtering)."""
@@ -65,34 +121,45 @@ def scan_folder():
         messagebox.showerror("Error", "Invalid folder path!")
         return
 
-    # Clear previous results
-    for widget in files_frame.winfo_children():
+    gitignore_dirs, gitignore_files = load_gitignore_patterns(root)
+
+    # Hide selection bar during refresh
+    select_all_var.set(False)
+    invert_var.set(False)
+    selection_bar.grid_remove()
+
+    # Clear previous file list
+    for widget in scrollable_frame.winfo_children():
         widget.destroy()
-    file_vars.clear()
     files.clear()
+    file_vars.clear()
 
     i = 0
-    # Use os.walk so we can prune directories in-place for speed
+
     for dirpath, dirs, filenames in os.walk(root):
-        # Prune ignored dirs BEFORE descending
-        dirs[:] = [d for d in dirs if not should_prune_dir(d)]
+        dirs[:] = [d for d in dirs if not should_prune_dir(d) and d not in gitignore_dirs]
 
         base = Path(dirpath)
+
         for filename in filenames:
             file_path = base / filename
-            # Skip files by name/extension
+
             if should_skip_file(file_path):
                 continue
-            # Also skip if any ancestor is in SKIP_DIRS (defensive, in case of symlinks, etc.)
+
+            if file_path.name in gitignore_files or file_path.suffix in gitignore_files:
+                continue
+
             if any(part in SKIP_DIRS for part in file_path.relative_to(root).parts):
                 continue
 
             var = tk.BooleanVar(value=False)
             cb = tk.Checkbutton(
-                files_frame,
+                scrollable_frame,
                 text=str(file_path.relative_to(root)),
                 variable=var,
-                anchor="w"
+                anchor="w",
+                command=update_select_all_state  # When this file checkbox changes, update Select All
             )
             cb.grid(row=i, column=0, sticky="w")
             file_vars.append(var)
@@ -101,6 +168,10 @@ def scan_folder():
 
     if i == 0:
         messagebox.showinfo("No Files Found", "No eligible files found in this folder!")
+    else:
+        selection_bar.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        separator = ttk.Separator(files_frame_container, orient="horizontal")
+        separator.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0,5))
 
 def export_files():
     """Export selected files and their contents into one text file."""
@@ -118,45 +189,107 @@ def export_files():
                     content = file_path.read_text(encoding="utf-8").strip()
                     if not content:
                         content = "empty file."
-                except (UnicodeDecodeError, FileNotFoundError):
+                except:
                     content = "[Could not read file]"
                 out.write(f"{file_path}:\n{content}\n\n")
 
     messagebox.showinfo("Export Complete", f"Exported selected files to:\n{output_file}")
 
-# --- GUI (User Interface) --- #
+# --- GUI --- #
 
 root = tk.Tk()
-root.title("File Exporter")
+root.title("Otter")
 
 tk.Label(root, text="Folder Path:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
 folder_entry = tk.Entry(root, width=50)
 folder_entry.grid(row=0, column=1, padx=5, pady=5)
 tk.Button(root, text="OK", command=scan_folder).grid(row=0, column=2, padx=5, pady=5)
 
-files_frame = tk.Frame(root)
-files_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
+# Container holding selection bar + file list
+files_frame_container = tk.Frame(root)
+files_frame_container.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
+
+files_frame_container.grid_columnconfigure(0, weight=1)
+files_frame_container.grid_columnconfigure(1, weight=0)
+files_frame_container.grid_rowconfigure(2, weight=1)
 
 root.grid_rowconfigure(1, weight=1)
-root.grid_columnconfigure(1, weight=1)
+for c in range(3):
+    root.grid_columnconfigure(c, weight=1)
 
-canvas = tk.Canvas(files_frame)
-scrollbar = tk.Scrollbar(files_frame, orient="vertical", command=canvas.yview)
+# --- Selection toggles (always exist, initially hidden) --- #
+
+select_all_var = tk.BooleanVar(value=False)
+invert_var = tk.BooleanVar(value=False)
+
+def update_select_all_state():
+    """Update the Select All checkbox based on current file selections."""
+    if file_vars and all(v.get() for v in file_vars):
+        select_all_var.set(True)
+    else:
+        select_all_var.set(False)
+
+def toggle_select_all():
+    """When Select All is toggled, apply its state to all file checkboxes."""
+    state = select_all_var.get()
+    for v in file_vars:
+        v.set(state)
+
+def toggle_invert():
+    """Invert current selection once, then reset the invert checkbox."""
+    if invert_var.get():
+        for v in file_vars:
+            v.set(not v.get())
+        invert_var.set(False)
+        update_select_all_state()
+
+selection_bar = tk.Frame(files_frame_container)
+
+selection_bar.grid_columnconfigure(0, weight=1)
+
+select_all_cb = tk.Checkbutton(selection_bar, text="Select All", variable=select_all_var, command=toggle_select_all)
+invert_cb = tk.Checkbutton(selection_bar, text="Invert Selection", variable=invert_var, command=toggle_invert)
+
+select_all_cb.grid(row=0, column=1, padx=5, sticky="e")
+invert_cb.grid(row=0, column=2, padx=10, sticky="e")
+
+selection_bar.grid_remove()
+
+# --- Scrollable area --- #
+
+canvas = tk.Canvas(files_frame_container)
+scrollbar = tk.Scrollbar(files_frame_container, orient="vertical", command=canvas.yview)
 scrollable_frame = tk.Frame(canvas)
 
 scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 canvas.configure(yscrollcommand=scrollbar.set)
 
-canvas.pack(side="left", fill="both", expand=True)
-scrollbar.pack(side="right", fill="y")
+canvas.grid(row=2, column=0, sticky="nsew")
+scrollbar.grid(row=2, column=1, sticky="ns")
+
+files = []
+file_vars = []
 
 tk.Button(root, text="Export Selected Files", command=export_files).grid(
     row=2, column=0, columnspan=3, pady=10
 )
 
-files = []
-file_vars = []
-files_frame = scrollable_frame
+def _on_mousewheel(event):
+    # Windows + Linux
+    canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+def _on_mac_scroll(event):
+    # macOS uses event.delta with inverted direction
+    canvas.yview_scroll(int(-1 * event.delta), "units")
+
+# Windows / Linux
+root.bind_all("<MouseWheel>", _on_mousewheel)
+
+# macOS two-finger scroll
+root.bind_all("<Shift-MouseWheel>", _on_mousewheel)
+root.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-3, "units"))
+root.bind_all("<Button-5>", lambda e: canvas.yview_scroll(3, "units"))
+root.bind_all("<MouseWheel>", _on_mac_scroll)
 
 root.mainloop()
