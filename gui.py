@@ -1,10 +1,12 @@
 import tkinter as tk 
 import tkinter.ttk as ttk 
+import os
 from tkinter import messagebox 
 from pathlib import Path 
 from tkinterdnd2 import TkinterDnD, DND_FILES 
 from scanner import scan_folder as scanner_run 
 from dnd import handle_drop 
+from fnmatch import fnmatch
 
 # ---------------- App Launcher ---------------- # 
 def launch_app():
@@ -25,6 +27,8 @@ class UI:
         self.files = []
         self.file_vars = []
         self.current_folder = None
+
+        self.structure_text = None
         
         # Create main container
         self.main_container = tk.Frame(self.root)
@@ -48,17 +52,75 @@ class UI:
         self.configure_scroll()
 
     def create_structure_page(self):
-        """Create project structure page"""
         page = tk.Frame(self.main_container)
         self.pages["structure"] = page
-        
+
+        # Back button at top left
         tk.Button(
             page, text="← Back", command=lambda: self.show_page("main")
-        ).place(x=10, y=10)
-        
-        tk.Label(
-            page, text="Project Structure (placeholder)", font=("Arial", 16)
-        ).place(x=20, y=60)
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=10)
+
+        # Title
+        tk.Label(page, text="Project Structure", font=("Arial", 16)).grid(
+            row=1, column=0, sticky="w", padx=10, pady=(10, 5)
+        )
+
+        # Configure grid weights for the page
+        page.grid_rowconfigure(2, weight=1)
+        page.grid_columnconfigure(0, weight=1)
+
+        # Main container for the text widget and controls
+        main_container = tk.Frame(page, bd=1, relief=tk.SUNKEN)
+        main_container.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Configure main container grid
+        main_container.grid_rowconfigure(1, weight=1)
+        main_container.grid_columnconfigure(0, weight=1)
+
+        # Toolbar frame at the top of the container
+        toolbar = tk.Frame(main_container, height=35)
+        toolbar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        toolbar.grid_propagate(False)  # Keep fixed height
+
+        # Configure toolbar columns
+        toolbar.grid_columnconfigure(0, weight=1)  # Spacer on left
+        toolbar.grid_columnconfigure(1, weight=0)  # Copy button on right
+
+        # Copy button in toolbar
+        self.copy_btn = tk.Button(
+            toolbar, 
+            text="Copy", 
+            width=8,
+            command=self.copy_structure_graph
+        )
+        self.copy_btn.grid(row=0, column=1, padx=5)
+
+        # Text display area with scrollbar
+        text_frame = tk.Frame(main_container)
+        text_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=(0, 5))
+
+        # Configure text frame grid
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(1, weight=0)
+
+        # Create scrollbar
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Create text widget
+        txt = tk.Text(
+            text_frame, 
+            wrap="none",
+            yscrollcommand=scrollbar.set,
+            width=70,
+            height=20
+        )
+        txt.grid(row=0, column=0, sticky="nsew")
+        scrollbar.config(command=txt.yview)
+
+        txt.configure(state="disabled")
+        self.structure_text = txt
 
     def create_settings_page(self):
         """Create settings page"""
@@ -378,6 +440,8 @@ class UI:
         self.btn_structure.grid(row=0, column=1, padx=5)
         self.btn_settings.grid(row=0, column=2, padx=5)
 
+        self.generate_structure_graph()
+
     # ------------------------------------------------- 
     def update_select_all_state(self):
         if self.file_vars and all(v.get() for v in self.file_vars):
@@ -424,3 +488,127 @@ class UI:
         for v in self.file_vars:
             v.set(not v.get())
         self.update_select_all_state()
+
+    # -------------------------------------------------
+    # Generate project structure graph
+    def generate_structure_graph(self):
+        if not self.current_folder:
+            return
+
+        root = self.current_folder
+
+        # load .gitignore
+        gitignore = root / ".gitignore"
+        patterns = []
+        if gitignore.exists():
+            for line in gitignore.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                patterns.append(line)
+
+        def default_ignore(name: str):
+            if name.startswith("."):
+                return True
+            bad = [
+                "build", "dist", "target", "__pycache__", "node_modules",
+                "venv", ".venv", "env", "out", ".cache", ".mypy_cache",
+                ".pytest_cache", ".gradle", ".cargo", "Pods", ".dart_tool",
+            ]
+            return name in bad
+
+        def ignored(path: Path):
+            try:
+                rel = str(path.relative_to(root))
+            except ValueError:
+                return False
+            for p in patterns:
+                if p.endswith("/") and rel.startswith(p.rstrip("/")):
+                    return True
+                if "*" in p and fnmatch(rel, p):
+                    return True
+                if rel == p:
+                    return True
+            return False
+
+        tree_lines = []
+
+        def collect_items(path: Path, prefix: str = ""):
+            try:
+                items = sorted(path.iterdir(), key=lambda p: p.name.lower())
+            except (PermissionError, OSError):
+                return
+            
+            # filter items
+            filtered_items = []
+            for item in items:
+                if ignored(item) or default_ignore(item.name):
+                    continue
+                filtered_items.append(item)
+            
+            for i, item in enumerate(filtered_items):
+                is_last = (i == len(filtered_items) - 1)
+                
+                # current line prefix
+                if is_last:
+                    line_prefix = prefix + "└── "
+                    next_prefix = prefix + "    "
+                else:
+                    line_prefix = prefix + "├── "
+                    next_prefix = prefix + "│   "
+                
+                tree_lines.append(f"{line_prefix}{item.name}")
+                
+                # if directory, recurse
+                if item.is_dir():
+                    collect_items(item, next_prefix)
+
+        # special handling for root directory
+        root_items = []
+        for item in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+            if ignored(item) or default_ignore(item.name):
+                continue
+            root_items.append(item)
+        
+        for i, item in enumerate(root_items):
+            is_last = (i == len(root_items) - 1)
+            
+            if is_last:
+                prefix = "└── "
+                next_prefix = "    "
+            else:
+                prefix = "├── "
+                next_prefix = "│   "
+            
+            tree_lines.append(f"{prefix}{item.name}")
+            
+            if item.is_dir():
+                collect_items(item, next_prefix)
+
+        text = "\n".join(tree_lines)
+        
+        self.structure_text.configure(state="normal")
+        self.structure_text.delete("1.0", "end")
+        self.structure_text.insert("1.0", text)
+        self.structure_text.configure(state="disabled")
+
+    # -------------------------------------------------
+    # Copy structure graph to clipboard
+    def copy_structure_graph(self):
+        """Copy structure graph to clipboard with button state feedback"""
+        content = self.structure_text.get("1.0", "end-1c")
+        if not content.strip():
+            return
+        
+        # Copy to clipboard
+        self.root.clipboard_clear()
+        self.root.clipboard_append(content)
+        
+        # Change button state
+        self.copy_btn.config(text="Copied!", state="disabled")
+        
+        # Restore original state after 2 seconds
+        def restore_button():
+            self.copy_btn.config(text="Copy", state="normal")
+        
+        self.root.after(2000, restore_button)
