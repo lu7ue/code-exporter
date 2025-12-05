@@ -28,11 +28,13 @@
 
 ## Current Features
 
-- **Simple Graphical Interface:** Provide a lightweight Tkinter-based GUI for visual folder input and file selection.
-- **Folder Scanning and Filtering:** Scan a folder and list all readable files inside it. Automatically skip unnecessary files and folders such as `.git`, `__pycache__`, `node_modules`, `.vscode`, images, logs, and binaries.  
-- **File Selection and Exporting:** Select specific files using checkboxes and export them into a single text file (`project_export.txt`) saved in the Downloads folder. Each exported file includes its path and content.  
-- **Empty File Handling:** Automatically mark empty or unreadable files with placeholders like "empty file" or "[Could not read file]".  
-- **Pop-up Notifications:** Show clear pop-up messages for invalid folder paths, empty scan results, and successful exports.  
+- **Simple Graphical Interface:** A lightweight Tkinter-based interface with drag-and-drop folder input, navigation buttons, and a clear button to reset the current project.
+- **Folder Scanning and Filtering:** Automatically scans a selected folder, applies built-in ignore rules, and also reads `.gitignore` to skip irrelevant files such as caches, configs, images, logs, binaries, and other noise.
+- **Flexible File Selection:** Choose files using checkboxes with quick actions like select all, deselect all, or invert selection.
+- **Project Structure View:** A dedicated structure page provides a tree-style visualization of the project and supports one-click copy-to-clipboard.
+- **File Exporting:** Export selected files into a single consolidated text file (`project_export.txt`) stored in the Downloads folder, including each file’s path and its content.
+- **Empty File Handling:** Detects unreadable or empty files and marks them with clear placeholders such as "[Empty file]" or "[Could not read file]".
+- **Pop-up Notifications:** Provides concise pop-ups for invalid paths, empty results, completed exports, and other key interactions.
 
 ---
 
@@ -42,11 +44,11 @@ Clone this repository and navigate to the project folder, then run:
 
 ```python
 python -m venv venv          # Create a virtual environment
-source venv/bin/activate     # Activate the environment
+source venv/bin/activate     # Activate the environment on MacOS
 python main.py               # Run the tool
 ```
-If you are using Windows, the commands may differ slightly.  
-Activate your environment using the appropriate command for your system before running `python main.py`.
+If you are using Windows, the command for activating the enviornment may differ slightly. For example, you can run `.\venv\Scripts\Activate.ps1`.  
+Please activate your environment using the appropriate command for your system before running `python main.py`.
 
 ### Build as a Standalone App (macOS Example)
 
@@ -55,13 +57,13 @@ If you want to turn this tool into a standalone app so you can run it directly w
 1. Install PyInstaller (only needed once): `pip install pyinstaller`
 2. In the project folder, run: `pyinstaller --noconfirm --onefile --windowed main.py`.  
     This will automatically create two folders: `build` and `dist`. Inside the `dist` folder, you will find an executable file named `main`.  
-3. (Optional) Rename the file for clarity: `mv dist/main dist/CodeExporter-macOS`
-4. Now you can simply double-click `CodeExporter-macOS` to open the app. It works exactly the same as running the Python script, but doesn’t require opening a terminal.
+3. (Optional) Rename the file for clarity: `mv dist/main dist/Otter-macOS`
+4. Now you can simply double-click `Otter-macOS` to open the app. It works exactly the same as running the Python script, but doesn’t require opening a terminal.
 
 > Tip: 
-> 1. You can move the CodeExporter-macOS file anywhere you like (for example, to your Applications folder) and run it directly.
-> 2. If you want to share this tool with your friends, you can simply send them the `CodeExporter-macOS` file.<br>
->   However, they might need to grant permission to run it — for example, on macOS, go to `System Settings` → `Privacy & Security`, click `Run Anyway`, and if necessary, run the following command in the Terminal to make it executable: `chmod +x /the-path-to/CodeExporter-macOS`.
+> 1. You can move the `Otter-macOS` file anywhere you like (for example, to your Applications folder) and run it directly.
+> 2. If you want to share this tool with your friends, you can simply send them the `Otter-macOS` file.<br>
+>   However, they might need to grant permission to run it — for example, on macOS, go to `System Settings` → `Privacy & Security`, click `Run Anyway`, and if necessary, run the following command in the Terminal to make it executable: `chmod +x /the-path-to/Otter-macOS`.
 
 ## Credits
 Video by Magda Ehlers: https://www.pexels.com/video/an-otter-swimming-2554576/
