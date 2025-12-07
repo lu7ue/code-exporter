@@ -171,19 +171,21 @@ class UI:
     # Build folder input bar
     # -------------------------------------------------
     def build_path_input(self, parent):
-        parent.grid_columnconfigure(0, weight=0)
-        parent.grid_columnconfigure(1, weight=1)
-        parent.grid_columnconfigure(2, weight=0)
-        
-        tk.Label(parent, text="Folder Path:").grid(
-            row=0, column=0, padx=8, pady=15, sticky="w"
-        )
-        self.folder_entry = tk.Entry(parent, width=52)
-        self.folder_entry.grid(row=0, column=1, padx=5, sticky="ew")
-        # Trigger folder scanning
-        tk.Button(parent, text="OK", command=self.scan).grid(
-            row=0, column=2, padx=8
-        )
+        parent.grid_columnconfigure(0, weight=1)
+
+    # create row frame for label, entry, button
+        row_frame = tk.Frame(parent)
+        row_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=10)
+        row_frame.grid_columnconfigure(0, weight=0)  # Label
+        row_frame.grid_columnconfigure(1, weight=1)  # Entry
+        row_frame.grid_columnconfigure(2, weight=0)  # Button
+        tk.Label(row_frame, text="Folder Path:").grid(row=0, column=0, padx=5, sticky="w")
+
+        self.folder_entry = tk.Entry(row_frame)
+        self.folder_entry.grid(row=0, column=1, sticky="ew", padx=5)
+
+        tk.Button(row_frame, text="OK", command=self.scan).grid(row=0, column=2, padx=5)
+
 
     # -------------------------------------------------
     # Build drag-and-drop folder zone
@@ -191,40 +193,39 @@ class UI:
     def build_drop_zone(self, parent):
         frame = tk.Frame(parent)
         frame.grid(row=1, column=0, columnspan=3, padx=12, pady=12, sticky="ew")
-        
+
+        # Create drop area canvas
         canvas = tk.Canvas(frame, height=60, highlightthickness=0, bd=0)
         canvas.pack(fill="both", expand=True)
         self.drop_canvas = canvas
 
-        def draw_border(color="#8e8e93"):
-            canvas.delete("border")
-            w = max(canvas.winfo_width() - 4, 1)
-            h = max(canvas.winfo_height() - 4, 1)
-            canvas.create_rectangle(
-                2, 2, w, h, outline=color, width=1, tag="border"
-            )
-
-        canvas.bind("<Configure>", lambda e: draw_border())
-        canvas.after(50, draw_border)
-
-        # Center text inside drop area
+        # Drop instruction text
         self.drop_text_id = canvas.create_text(
-            0, 0, text="Paste your project path above\nor drop the folder here", 
-            anchor="center", fill="#444", justify="center"
+            0, 0,
+            text="Paste your project path above\nor drop the folder here",
+            anchor="center",
+            fill="#444",
+            justify="center"
         )
 
-        def reposition_text(event):
-            canvas.coords(
-                self.drop_text_id, canvas.winfo_width() / 2, canvas.winfo_height() / 2
-            )
+        # Draw border around drop area
+        def draw_border(color="#8e8e93"):
+            w = canvas.winfo_width()
+            h = canvas.winfo_height()
+            if w <= 1 or h <= 1:
+                return
+            canvas.delete("border")
+            canvas.create_rectangle(1, 1, w-1, h-1, outline=color, width=1, tag="border")
+            canvas.coords(self.drop_text_id, w/2, h/2)
 
-        canvas.bind("<Configure>", reposition_text)
+    
+        canvas.bind("<Configure>", lambda e: draw_border())
 
-        # Register drag and drop events
         frame.drop_target_register(DND_FILES)
         frame.dnd_bind("<<Drop>>", lambda e: handle_drop(e, self.folder_entry, self.scan))
         frame.dnd_bind("<<DragEnter>>", lambda e: draw_border("#555555"))
         frame.dnd_bind("<<DragLeave>>", lambda e: draw_border())
+
 
     # -------------------------------------------------
     # Handle scroll events for file list
