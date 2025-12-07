@@ -24,8 +24,6 @@
   <p>Paste your project folder path, scan the files, select what you need, and export. Empty or unreadable files are automatically marked.</p>
 </div>
 
----
-
 ## Current Features
 
 - **Simple Graphical Interface:** A lightweight Tkinter-based interface with drag-and-drop folder input, navigation buttons, and a clear button to reset the current project.
@@ -35,10 +33,36 @@
 - **File Exporting:** Export selected files into a single consolidated text file (`project_export.txt`) stored in the Downloads folder, including each file’s path and its content.
 - **Empty File Handling:** Detects unreadable or empty files and marks them with clear placeholders such as "[Empty file]" or "[Could not read file]".
 - **Pop-up Notifications:** Provides concise pop-ups for invalid paths, empty results, completed exports, and other key interactions.
+- **Recent Path History:** Automatically stores up to the five most recently used folder paths for quick access in future sessions.
 
----
+## Demo
 
-## How to Run
+<div align="center">
+  <img src="img/dnd.gif" width="520">
+</div>
+<p align="center">Drag-and-Drop Folder Input</p>
+
+<div align="center">
+  <img src="img/recent_path.gif" width="520">
+</div>
+<p align="center">Recent Path History</p>
+
+<div align="center">
+  <img src="img/select_all.gif" width="520">
+</div>
+<p align="center">Select All / Deselect All / Invert Selection</p>
+
+<div align="center">
+  <img src="img/project_structure.gif" width="520">
+</div>
+<p align="center">Project Structure Tree & One-Click Copy</p>
+
+## Getting Started
+
+You can download the latest prebuilt macOS and Windows applications from the [Releases](https://github.com/lu7ue/otter/releases) page.  
+Alternatively, you can run Otter from source using the instructions below.
+
+**Installation：**
 
 Clone this repository and navigate to the project folder, then run:
 
@@ -47,23 +71,26 @@ python -m venv venv          # Create a virtual environment
 source venv/bin/activate     # Activate the environment on MacOS
 python main.py               # Run the tool
 ```
-If you are using Windows, the command for activating the enviornment may differ slightly. For example, you can run `.\venv\Scripts\Activate.ps1`.  
-Please activate your environment using the appropriate command for your system before running `python main.py`.
 
-### Build as a Standalone App (macOS Example)
+Tip: 
+1. If creating a virtual environment fails, you may not have Python installed on your system. Please install Python first, then try again.
+2. If you are using Windows, the command for activating the enviornment may differ slightly. For example, you can run `.\venv\Scripts\Activate.ps1`. Please activate your environment using the appropriate command for your system.
+3. If running `python main.py` results in an import error for `tkinterdnd2`, install it with: `pip install tkinterdnd2`.
 
-If you want to turn this tool into a standalone app so you can run it directly without using the terminal, follow these steps:
+<br>
 
-1. Install PyInstaller (only needed once): `pip install pyinstaller`
-2. In the project folder, run: `pyinstaller --noconfirm --onefile --windowed main.py`.  
-    This will automatically create two folders: `build` and `dist`. Inside the `dist` folder, you will find an executable file named `main`.  
-3. (Optional) Rename the file for clarity: `mv dist/main dist/Otter-macOS`
-4. Now you can simply double-click `Otter-macOS` to open the app. It works exactly the same as running the Python script, but doesn’t require opening a terminal.
+> If you prefer to build the standalone macOS or Windows application yourself, see the [BUILD INSTRUCTIONS](BUILD_INSTRUCTIONS.md) for instructions.
 
-> Tip: 
-> 1. You can move the `Otter-macOS` file anywhere you like (for example, to your Applications folder) and run it directly.
-> 2. If you want to share this tool with your friends, you can simply send them the `Otter-macOS` file.<br>
->   However, they might need to grant permission to run it — for example, on macOS, go to `System Settings` → `Privacy & Security`, click `Run Anyway`, and if necessary, run the following command in the Terminal to make it executable: `chmod +x /the-path-to/Otter-macOS`.
+
+## Storage of Recent Folder History
+The application stores the history of opened folders in a JSON file named `Otter_history.json`. The file is automatically created and updated by the app.
+
+**File locations by operating system:**
+- Windows: `C:\Users\<username>\AppData\Roaming\Otter_history.json`
+- macOS: `/Users/<username>/Library/Application Support/Otter_history.json`
+- Linux: `/home/<username>/.local/share/Otter_history.json`
+
+Replace `<username>` with your actual system username.
 
 ## Credits
 Video by Magda Ehlers: https://www.pexels.com/video/an-otter-swimming-2554576/
